@@ -1,14 +1,15 @@
 import numpy as np
+import pydot
 from DecisionTreeClassifier import DecisionTree
 
 
 class ID3:
 
-    def __init__(self):
+    def __init__(self, filename='ID2.dot'):
         self.train_set = None
         self.test_set = None
         self.num_of_features = None
-        self.classifier = DecisionTree()
+        self.classifier = DecisionTree(filename)
         self.predictions = None
 
     def fit_predict(self, train_set: np.ndarray, test_set: np.ndarray) -> np.ndarray:

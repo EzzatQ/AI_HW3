@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from graphviz import Digraph
 
 class DTCNode:
 
@@ -11,19 +12,34 @@ class DTCNode:
         self.feature_index = feature_index
         self.feature_split_value = feature_split_value
 
+    def toString(self):
+        str = None
+        label = "Healthy" if self.label == 0 else "Sick"
+        if self.is_leaf:
+            str = f"class = {label}"
+        else:
+            str = f"feature[{self.feature_index}] < {self.feature_split_value}"
+        return str
+
 
 class DecisionTree:
 
-    def __init__(self):
+    def __init__(self, file_name='ID2.dot'):
         self.root_node = None
+        self.graph = Digraph(format="png", filename=file_name)
+        self.max_node_name = 0
+        self.filename=file_name
 
     def train(self, train_set: np.ndarray):
         if self.root_node is not None:
             return
         self.root_node = self.__developNode(train_set)
+        self.buildGraph(self.root_node)
+        self.showTree()
 
     def reset(self):
         self.root_node = None
+        self.c
 
     def predict(self, test_set: np.ndarray):
         labels = np.empty(test_set.shape[0])
@@ -42,6 +58,25 @@ class DecisionTree:
             return self.__search(x, node.left)
         else:
             return self.__search(x, node.right)
+
+    def __developNode(self, train_set: np.ndarray):
+        """
+        recursive function that builds the Decision tree.
+        :param train_set: set of examples for the current node
+        :return: root node of the tree
+        """
+        if train_set.shape[0] == 0:
+            return None
+        label = self.__allLabelsEqual(train_set)
+        if label != -1:
+            node = DTCNode(is_leaf=True, label=label)
+            return node
+        index, split_value = self.__chooseNextFeature(train_set)
+        node = DTCNode(feature_index=index-1, feature_split_value=split_value)
+        left_train_set, right_train_set = self.__split_set(train_set, index, split_value)
+        node.left = self.__developNode(left_train_set)
+        node.right = self.__developNode(right_train_set)
+        return node
 
     def __chooseNextFeature(self, train_set: np.ndarray):
         """
@@ -75,7 +110,7 @@ class DecisionTree:
                 best_val, max_ig = splitter, ig
         return best_val, max_ig
 
-    def __informationGain(self, parent_set: np.ndarray, left_set: np.ndarray , right_set: np.ndarray):
+    def __informationGain(self, parent_set: np.ndarray, left_set: np.ndarray, right_set: np.ndarray):
         parent_entropy = self.__entropy(parent_set)
         weighted_left_entropy = 0 if left_set.shape[0] == 0 else (left_set.shape[0]/parent_set.shape[0]) * self.__entropy(left_set)
         weighted_right_entropy = 0 if right_set.shape[0] == 0 else (right_set.shape[0]/parent_set.shape[0]) * self.__entropy(right_set)
@@ -86,7 +121,8 @@ class DecisionTree:
         total_labels = true_labels + false_labels
         prob_true = true_labels / total_labels
         prob_false = false_labels / total_labels
-        return -((0 if prob_true == 0 else prob_true * math.log2(prob_true)) + (0 if prob_false == 0 else prob_false * math.log2(prob_false)))
+        return -((0 if prob_true == 0 else prob_true * math.log2(prob_true)) +
+                 (0 if prob_false == 0 else prob_false * math.log2(prob_false)))
 
     def __countLabels(self, train_set: np.ndarray):
         num_true, num_false = 0, 0
@@ -105,33 +141,14 @@ class DecisionTree:
             possible_vals.append(diff)
         return possible_vals
 
-    def __developNode(self, train_set: np.ndarray):
-        """
-        recursive function that builds the Decision tree.
-        :param train_set: set of examples for the current node
-        :return: root node of the tree
-        """
-        if train_set.shape[0] == 0:
-            return None
-        label = self.__allLabelsEqual(train_set)
-        if label != -1:
-            node = DTCNode(is_leaf=True, label=label)
-            return node
-        index, split_value = self.__chooseNextFeature(train_set)
-        node = DTCNode(feature_index=index-1, feature_split_value=split_value)
-        left_train_set, right_train_set = self.__split_set(train_set, index, split_value)
-        node.left = self.__developNode(left_train_set)
-        node.right = self.__developNode(right_train_set)
-        return node
-
-    def __split_set(self, train_set: np.ndarray, index, split_value):
+    def __split_set(self, train_set: np.ndarray, feature_index, split_value):
         left_train_set, right_train_set = np.empty((0, train_set.shape[1])), np.empty((0, train_set.shape[1]))
-        for row in train_set:
-            if row[index] < split_value:
-                left_train_set = np.vstack([left_train_set, row])
+        for i in range(train_set.shape[0]):
+            if train_set[i, feature_index] < split_value:
+                left_train_set = np.vstack([left_train_set, train_set[i]])
                 # np.append(left_train_set, np.expand_dims(row, axis=0), axis=0)
             else:
-                right_train_set = np.vstack([right_train_set, row])
+                right_train_set = np.vstack([right_train_set, train_set[i]])
                 # np.append(right_train_set, np.expand_dims(row, axis=0), axis=0)
         return left_train_set, right_train_set
 
@@ -141,3 +158,19 @@ class DecisionTree:
             if row[0] != val:
                 return -1
         return val
+
+    def showTree(self):
+        if self.root_node is None:
+            return
+        # self.graph.render(filename=self.filename, view=False)
+
+    def buildGraph(self, node: DTCNode, parentName=None):
+        self.graph.node(f"{self.max_node_name}", label=node.toString())
+        if parentName is not None:
+            self.graph.edge(f"{self.max_node_name}", parentName)
+        if node.left is not None:
+            self.buildGraph(node.left, f"{self.max_node_name}")
+        if node.right is not None:
+            self.buildGraph(node.right, f"{self.max_node_name}")
+        self.max_node_name += 1
+

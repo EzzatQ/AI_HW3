@@ -1,9 +1,12 @@
+from matplotlib import pyplot as plt
 from ID3 import ID3
 import csv
 import numpy as np
 import math
 from KFoldCrossValidation import KFoldCrossValidation as KFCV
 from numpy import genfromtxt
+from sklearn import tree
+
 
 
 def processInput(csv_file):
@@ -18,10 +21,16 @@ def processInput(csv_file):
 
 
 def main():
+
     data = processInput('train.csv')
-    learner = ID3()
+    # clf = tree.DecisionTreeClassifier(random_state=0, criterion="entropy")
+    # clf = ID3()
+    # clf.train(data)
+    # fig = plt.figure(figsize=(25, 20))
+    # tree.plot_tree(clf, class_names=['Sick', 'Healthy'], filled=True)
+    # fig.savefig("decistion_tree_entropy.png")
     k = 5
-    k_cross = KFCV(k, learner, data)
+    k_cross = KFCV(k, ID3, data, shuffle=True)
     print(f"accuracy with {k}-folds is {k_cross.getError()} %")
 
 
