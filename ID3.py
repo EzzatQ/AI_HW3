@@ -5,7 +5,7 @@ from DecisionTreeClassifier import DecisionTree
 
 class ID3:
 
-    def __init__(self, filename='ID2.dot'):
+    def __init__(self, filename='ID3'):
         self.train_set = None
         self.test_set = None
         self.num_of_features = None
