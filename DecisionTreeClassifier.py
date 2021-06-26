@@ -2,24 +2,75 @@ import math
 import numpy as np
 from graphviz import Digraph
 
+colors = ["Orchid",
+          "PaleGoldenRod",
+          "PaleGreen",
+          "PaleTurquoise",
+          "PaleVioletRed",
+          "PapayaWhip",
+          "PeachPuff",
+          "Peru",
+          "Pink",
+          "Plum",
+          "PowderBlue",
+          "Purple",
+          "RebeccaPurple",
+          "Red",
+          "RosyBrown",
+          "RoyalBlue",
+          "SaddleBrown",
+          "Salmon",
+          "SandyBrown",
+          "SeaGreen",
+          "SeaShell",
+          "Sienna",
+          "Silver",
+          "SkyBlue",
+          "SlateBlue",
+          "SlateGray",
+          "SlateGrey",
+          "Snow",
+          "SpringGreen",
+          "SteelBlue",
+          "Tan",
+          "Teal",
+          "Thistle",
+          "Tomato",
+          "Turquoise",
+          "Violet",
+          "Wheat",
+          "White",
+          "WhiteSmoke",
+          "Yellow",
+          "YellowGreen"]
+
+
 class DTCNode:
 
-    def __init__(self, feature_index=None, feature_split_value=None, is_leaf=False, label=None):
+    def __init__(self, feature_index=None, feature_split_value=None, is_leaf=False, label=None, name=0,
+                 true_sample_num=None, false_sample_num=None, information_gain=None):
         self.is_leaf = is_leaf
         self.label = label
         self.left = None
         self.right = None
         self.feature_index = feature_index
         self.feature_split_value = feature_split_value
+        self.unique_id = name
+        self.sample_num = true_sample_num + false_sample_num
+        self.true_sample_num = true_sample_num
+        self.false_sample_num = false_sample_num
+        self.information_gain = information_gain
 
     def toString(self):
-        str = None
         label = "Healthy" if self.label == 0 else "Sick"
         if self.is_leaf:
-            str = f"class = {label}"
+            name = f"class = {label}\n"
         else:
-            str = f"feature[{self.feature_index}] < {self.feature_split_value}"
-        return str
+            name = f"feature[{self.feature_index}] < {self.feature_split_value}\n"
+            name += f"IG = {self.information_gain}\n"
+        name += f"sample # = {self.sample_num}\n"
+        name += f"true = {self.true_sample_num}, false = {self.false_sample_num}"
+        return name
 
 
 class DecisionTree:
@@ -28,18 +79,17 @@ class DecisionTree:
         self.root_node = None
         self.graph = Digraph(format="png", filename=file_name)
         self.max_node_name = 0
-        self.filename=file_name
+        self.filename = file_name
 
     def train(self, train_set: np.ndarray):
         if self.root_node is not None:
             return
         self.root_node = self.__developNode(train_set)
-        self.buildGraph(self.root_node)
+        self.buildGraph(self.root_node, None)
         self.showTree()
 
     def reset(self):
         self.root_node = None
-        self.c
 
     def predict(self, test_set: np.ndarray):
         labels = np.empty(test_set.shape[0])
@@ -48,7 +98,7 @@ class DecisionTree:
         return labels
 
     def __predictOne(self, x: np.ndarray):
-        assert(len(x.shape) == 1)
+        assert (len(x.shape) == 1)
         return self.__search(x, self.root_node)
 
     def __search(self, x: np.ndarray, node: DTCNode):
@@ -67,12 +117,17 @@ class DecisionTree:
         """
         if train_set.shape[0] == 0:
             return None
-        label = self.__allLabelsEqual(train_set)
+        true_num, false_num = self.__countLabels(train_set)
+        total_num = true_num + false_num
+        label = 1 if true_num == total_num else 0 if false_num == total_num else -1
+        self.max_node_name += 1
         if label != -1:
-            node = DTCNode(is_leaf=True, label=label)
+            node = DTCNode(is_leaf=True, label=label, name=self.max_node_name,
+                           true_sample_num=true_num, false_sample_num=false_num)
             return node
-        index, split_value = self.__chooseNextFeature(train_set)
-        node = DTCNode(feature_index=index-1, feature_split_value=split_value)
+        index, split_value, ig = self.__chooseNextFeature(train_set)
+        node = DTCNode(feature_index=index - 1, feature_split_value=split_value, name=self.max_node_name,
+                       true_sample_num=true_num, false_sample_num=false_num, information_gain=ig)
         left_train_set, right_train_set = self.__split_set(train_set, index, split_value)
         node.left = self.__developNode(left_train_set)
         node.right = self.__developNode(right_train_set)
@@ -91,7 +146,7 @@ class DecisionTree:
             val, ig = self.__bestFeatureSplitValue(train_set, i)
             if ig > max_ig:
                 max_ig, best_index, best_split_value = ig, i, val
-        return best_index, best_split_value
+        return best_index, best_split_value, max_ig
 
     def __bestFeatureSplitValue(self, train_set: np.ndarray, feature_index):
         """
@@ -102,18 +157,22 @@ class DecisionTree:
         """
         feature_vals = train_set[:, feature_index]
         split_vals = self.__possibleSplitValues(feature_vals)
-        best_val, max_ig = -1,  -1
+        best_val, max_ig = -1, -1
         for splitter in split_vals:
             left_set, right_set = self.__split_set(train_set, feature_index, splitter)
             ig = self.__informationGain(train_set, left_set, right_set)
             if ig > max_ig:
                 best_val, max_ig = splitter, ig
+                if ig == 1:
+                    break
         return best_val, max_ig
 
     def __informationGain(self, parent_set: np.ndarray, left_set: np.ndarray, right_set: np.ndarray):
         parent_entropy = self.__entropy(parent_set)
-        weighted_left_entropy = 0 if left_set.shape[0] == 0 else (left_set.shape[0]/parent_set.shape[0]) * self.__entropy(left_set)
-        weighted_right_entropy = 0 if right_set.shape[0] == 0 else (right_set.shape[0]/parent_set.shape[0]) * self.__entropy(right_set)
+        weighted_left_entropy = 0 if left_set.shape[0] == 0 else (left_set.shape[0] / parent_set.shape[
+            0]) * self.__entropy(left_set)
+        weighted_right_entropy = 0 if right_set.shape[0] == 0 else (right_set.shape[0] / parent_set.shape[
+            0]) * self.__entropy(right_set)
         return parent_entropy - weighted_right_entropy - weighted_left_entropy
 
     def __entropy(self, train_set):
@@ -134,9 +193,10 @@ class DecisionTree:
         return num_true, num_false
 
     def __possibleSplitValues(self, feature_values: np.ndarray):
-        feature_values.sort()
+        features_copy = np.copy(feature_values)
+        features_copy.sort()
         possible_vals = []
-        for i in range(feature_values.shape[0] - 1):
+        for i in range(features_copy.shape[0] - 1):
             diff = (feature_values[i + 1] + feature_values[i]) / 2
             possible_vals.append(diff)
         return possible_vals
@@ -146,10 +206,8 @@ class DecisionTree:
         for i in range(train_set.shape[0]):
             if train_set[i, feature_index] < split_value:
                 left_train_set = np.vstack([left_train_set, train_set[i]])
-                # np.append(left_train_set, np.expand_dims(row, axis=0), axis=0)
             else:
                 right_train_set = np.vstack([right_train_set, train_set[i]])
-                # np.append(right_train_set, np.expand_dims(row, axis=0), axis=0)
         return left_train_set, right_train_set
 
     def __allLabelsEqual(self, train_set: np.ndarray):
@@ -162,15 +220,18 @@ class DecisionTree:
     def showTree(self):
         if self.root_node is None:
             return
-        # self.graph.render(filename=self.filename, view=False)
+        self.graph.render(filename=self.filename, view=False, cleanup=True)
 
-    def buildGraph(self, node: DTCNode, parentName=None):
-        self.graph.node(f"{self.max_node_name}", label=node.toString())
-        if parentName is not None:
-            self.graph.edge(f"{self.max_node_name}", parentName)
+    def buildGraph(self, node: DTCNode, parent: DTCNode):
+        if node.is_leaf:
+            self.graph.node(f"{node.unique_id}", label=node.toString(), style='filled',
+                            fillcolor='green' if node.label == 0 else "red")
+        else:
+            self.graph.node(f"{node.unique_id}", label=node.toString(), style='filled',
+                            fillcolor=colors[node.feature_index], shape="rectangle")
+        if parent is not None:
+            self.graph.edge(f"{parent.unique_id}", f"{node.unique_id}")
         if node.left is not None:
-            self.buildGraph(node.left, f"{self.max_node_name}")
+            self.buildGraph(node.left, node)
         if node.right is not None:
-            self.buildGraph(node.right, f"{self.max_node_name}")
-        self.max_node_name += 1
-
+            self.buildGraph(node.right, node)

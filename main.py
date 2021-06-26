@@ -6,6 +6,7 @@ import math
 from KFoldCrossValidation import KFoldCrossValidation as KFCV
 from numpy import genfromtxt
 from sklearn import tree
+from graphviz import Digraph
 
 
 
@@ -23,12 +24,17 @@ def processInput(csv_file):
 def main():
 
     data = processInput('train.csv')
-    # clf = tree.DecisionTreeClassifier(random_state=0, criterion="entropy")
-    # clf = ID3()
-    # clf.train(data)
-    # fig = plt.figure(figsize=(25, 20))
-    # tree.plot_tree(clf, class_names=['Sick', 'Healthy'], filled=True)
-    # fig.savefig("decistion_tree_entropy.png")
+    r = csv.reader(open('test.csv'))
+    lines = list(r)
+    test_set = np.array(lines, float)
+    mini_data = data[40:56, :6]
+    clf = tree.DecisionTreeClassifier(random_state=0, criterion="entropy")
+    X = test_set[:, 1:]
+    y = test_set[:, 0]
+    clf.fit(X, y)
+    fig = plt.figure(figsize=(25, 20))
+    tree.plot_tree(clf, class_names=['Sick', 'Healthy'], filled=True)
+    fig.savefig("decistion_tree_entropy.png")
     k = 5
     k_cross = KFCV(k, ID3, data, shuffle=True)
     print(f"accuracy with {k}-folds is {k_cross.getError()} %")
