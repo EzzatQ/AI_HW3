@@ -2,20 +2,20 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 from KFoldCrossValidation import KFoldCrossValidation
-from DecisionTreeClassifier import DecisionTree, DTCNode
+from PersonalizedDecisionTreeClassifier import PersonalizedDecisionTree, DTCNode
 
 
-class ID3:
+class PersonalizedID3:
 
-    def __init__(self, filename='ID3', early_pruning=False, early_pruning_param=5, normalise=True, hyperparam=1):
+    def __init__(self, filename='PersonalizedID3', early_pruning=False, early_pruning_param=5, normalise=True, hyperparam=1):
         self.train_set: np.ndarray = None
         self.test_set: np.ndarray = None
         self.num_of_features = None
-        self.classifier = DecisionTree(filename, normalise)
+        self.classifier = PersonalizedDecisionTree(filename, normalise)
         self.predictions = None
         self.early_pruning = early_pruning
         self.early_pruning_param = early_pruning_param
-
+        self.hyperparam = hyperparam
 
     def fit_predict(self, train_set: np.ndarray, test_set: np.ndarray) -> np.ndarray:
         """
@@ -37,7 +37,7 @@ class ID3:
         :param train_set
             train set given as a numpy.ndarray of dimension (#number of samples, number of features + 1)
             where the first column is the label (1/0).
-        :returns: classifier of type DecisionTreeClassifier
+        :returns: classifier of type PersonalizedDecisionTreeClassifier
         """
         self.classifier.train(train_set)
         if self.early_pruning:
@@ -73,6 +73,7 @@ class ID3:
                     false_positive += 1
                 else:
                     false_negative += 1
+
         return false_positive + 8 * false_negative
 
     def reset(self):
@@ -81,14 +82,14 @@ class ID3:
     def earlyPruning(self, sample_limit=12):
         self.__pre_order(self.classifier.root_node, sample_limit)
 
-    def __pre_order(self, node: DTCNode, sample_limit=12):
+    def __pre_order(self, node: DTCNode, sample_limit=5):
         if node is None:
             return
         if node.sample_num < sample_limit:
             node.left = None
             node.right = None
             node.is_leaf = True
-            node.label = 1 if node.true_sample_num > node.false_sample_num else 0
+            node.label = 0 if node.false_sample_num > node.true_sample_num * self.hyperparam else 1
 
         if node.left is not None:
             self.__pre_order(node.left, sample_limit)
@@ -96,27 +97,22 @@ class ID3:
             self.__pre_order(node.right, sample_limit)
 
 
-
-def experiment(data_set: np.ndarray):
+def hyperParamTuning(data_set: np.ndarray):
     # to run experiment, import ID3, and run the command ID3.experiment(datas_set)
     k = 5
-    pruning_param_options = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30]
-    pruning_params = []
-    pruning_acc = []
-    for param in pruning_param_options:
+    hyperparam_options = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,3,4,5,6,7,8,9,10]
+    hyperparams = []
+    hyperparams_loss = []
+    for param in hyperparam_options:
         file_name = f"experiment_ID3_with_pruning_param_{param}"
-        kf = KFoldCrossValidation(k, ID3, data_set, shuffle=True, early_pruning=True,
-                                  early_pruning_param=param, filename=file_name)
+        kf = KFoldCrossValidation(k, PersonalizedID3, data_set, shuffle=True, filename=file_name, hyperparam=1)
         acc = kf.getError()
-        pruning_params.append(param)
-        pruning_acc.append(acc)
+        hyperparams.append(param)
+        hyperparams_loss.append(acc)
         print(f"accuracy with early pruning param {param}: {acc}")
-        plt.plot(pruning_params, pruning_acc, "-o")
+        plt.plot(hyperparams, hyperparams_loss, "-o")
         plt.xlabel('Pruning Parameter')
         plt.ylabel('Accuracy')
-        plt.savefig(f"pruning_experiment_ID3_plot_{param}.png")
+        plt.savefig(f"hyperparam_tuning_with_{param}.png")
         plt.show()
-
-
-
 

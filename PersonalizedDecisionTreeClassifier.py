@@ -1,5 +1,5 @@
 import math
-
+from random import random
 import numpy as np
 from graphviz import Digraph
 
@@ -76,9 +76,9 @@ class DTCNode:
         return name
 
 
-class DecisionTree:
+class PersonalizedDecisionTree:
 
-    def __init__(self, file_name='ID2.dot', normalise=True):
+    def __init__(self, file_name='ID3.dot', normalise=True, hyperparam=1):
         self.root_node = None
         self.graph = Digraph(format="png", filename=file_name)
         self.max_node_name = 0
@@ -86,6 +86,7 @@ class DecisionTree:
         self.feature_maxes = []
         self.feature_mins = []
         self.normalise = normalise
+        self.hyperparam = hyperparam
 
     def train(self, train_set: np.ndarray):
         if self.root_node is not None:
@@ -127,9 +128,10 @@ class DecisionTree:
             return None
         true_num, false_num = self.__countLabels(train_set)
         total_num = true_num + false_num
-        label = 1 if true_num == total_num else 0 if false_num == total_num else -1
+        is_leaf = true_num == total_num or false_num == total_num
         self.max_node_name += 1
-        if label != -1:
+        if is_leaf:
+            label = 0 if false_num > true_num * self.hyperparam else 1
             node = DTCNode(is_leaf=True, label=label, name=self.max_node_name,
                            true_sample_num=true_num, false_sample_num=false_num)
             return node
@@ -140,6 +142,18 @@ class DecisionTree:
         node.left = self.__developNode(left_train_set)
         node.right = self.__developNode(right_train_set)
         return node
+
+    def __chooseSemiRandom(self, arr: list):
+        x = random()
+        cum = []
+        cum.append(arr[0])
+        total = arr[0]
+        for i in range(1, len(arr)):
+            cum.append(cum[i-1] + arr[i])
+            total += arr[i]
+        for i in range(len(arr)):
+            if cum[i]/total > x:
+                return i
 
     def __chooseNextFeature(self, train_set: np.ndarray):
         """
@@ -185,8 +199,8 @@ class DecisionTree:
 
     def __entropy(self, train_set):
         true_labels, false_labels = self.__countLabels(train_set)
-        total_labels = true_labels + false_labels
-        prob_true = true_labels / total_labels
+        total_labels = self.hyperparam * true_labels + false_labels
+        prob_true = self.hyperparam * true_labels / total_labels
         prob_false = false_labels / total_labels
         return -((0 if prob_true == 0 else prob_true * math.log2(prob_true)) +
                  (0 if prob_false == 0 else prob_false * math.log2(prob_false)))
