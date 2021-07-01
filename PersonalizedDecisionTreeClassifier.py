@@ -1,50 +1,6 @@
 import math
 from random import random
 import numpy as np
-from graphviz import Digraph
-
-colors = ["Orchid",
-          "PaleGoldenRod",
-          "PaleGreen",
-          "PaleTurquoise",
-          "PaleVioletRed",
-          "PapayaWhip",
-          "PeachPuff",
-          "Peru",
-          "Pink",
-          "Plum",
-          "PowderBlue",
-          "Purple",
-          "RebeccaPurple",
-          "Red",
-          "RosyBrown",
-          "RoyalBlue",
-          "SaddleBrown",
-          "Salmon",
-          "SandyBrown",
-          "SeaGreen",
-          "SeaShell",
-          "Sienna",
-          "Silver",
-          "SkyBlue",
-          "SlateBlue",
-          "SlateGray",
-          "SlateGrey",
-          "Snow",
-          "SpringGreen",
-          "SteelBlue",
-          "Tan",
-          "Teal",
-          "Thistle",
-          "Tomato",
-          "Turquoise",
-          "Violet",
-          "Wheat",
-          "White",
-          "WhiteSmoke",
-          "Yellow",
-          "YellowGreen"]
-
 
 class DTCNode:
 
@@ -62,8 +18,6 @@ class DTCNode:
         self.false_sample_num = false_sample_num
         self.information_gain = information_gain
 
-
-
     def toString(self):
         label = "Healthy" if self.label == 0 else "Sick"
         if self.is_leaf:
@@ -78,15 +32,17 @@ class DTCNode:
 
 class PersonalizedDecisionTree:
 
-    def __init__(self, file_name='ID3.dot', normalise=True, hyperparam=1):
+    def __init__(self, file_name='ID3.dot', normalise=True, entropy_param=3.5, split_by="information_gain"):
         self.root_node = None
-        self.graph = Digraph(format="png", filename=file_name)
         self.max_node_name = 0
         self.filename = file_name
         self.feature_maxes = []
         self.feature_mins = []
         self.normalise = normalise
-        self.hyperparam = hyperparam
+        self.entropy_param = entropy_param
+        self.split_by = split_by
+        if split_by not in ["information_gain", "gini"]:
+            raise Exception("wrong split_by option")
 
     def train(self, train_set: np.ndarray):
         if self.root_node is not None:
@@ -163,12 +119,20 @@ class PersonalizedDecisionTree:
         """
         best_index = -1
         max_ig = -1
+        min_gini = -1
         best_split_value = None
-        for i in range(1, train_set.shape[1]):
-            val, ig = self.__bestFeatureSplitValue(train_set, i)
-            if ig > max_ig:
-                max_ig, best_index, best_split_value = ig, i, val
-        return best_index, best_split_value, max_ig
+        if self.split_by == "information_gain":
+            for i in range(1, train_set.shape[1]):
+                val, ig = self.__bestFeatureSplitValue(train_set, i)
+                if ig >= max_ig:
+                    max_ig, best_index, best_split_value = ig, i, val
+            return best_index, best_split_value, max_ig
+        else:
+            for i in range(1, train_set.shape[1]):
+                val, gini = self.__bestFeatureSplitValue(train_set, i)
+                if gini <= min_gini:
+                    min_gini, best_index, best_split_value = gini, i, val
+            return best_index, best_split_value, min_gini
 
     def __bestFeatureSplitValue(self, train_set: np.ndarray, feature_index):
         """
@@ -179,15 +143,38 @@ class PersonalizedDecisionTree:
         """
         feature_vals = train_set[:, feature_index]
         split_vals = self.__possibleSplitValues(feature_vals)
-        best_val, max_ig = -1, -1
-        for splitter in split_vals:
-            left_set, right_set = self.__split_set(train_set, feature_index, splitter)
-            ig = self.__informationGain(train_set, left_set, right_set)
-            if ig > max_ig:
-                best_val, max_ig = splitter, ig
-                if ig == 1:
-                    break
-        return best_val, max_ig
+        best_val, max_ig, min_gini = -1, -1, -1
+        if self.split_by == "information_gain":
+            for splitter in split_vals:
+                left_set, right_set = self.__split_set(train_set, feature_index, splitter)
+                ig = self.__informationGain(train_set, left_set, right_set)
+                if ig >= max_ig:
+                    best_val, max_ig = splitter, ig
+                    if ig == 1:
+                        break
+            return best_val, max_ig
+        else:
+            for splitter in split_vals:
+                left_set, right_set = self.__split_set(train_set, feature_index, splitter)
+                gini = self.__giniGain(train_set, left_set, right_set)
+                if gini <= min_gini:
+                    best_val, min_gini = splitter, gini
+            return best_val, min_gini
+
+    def __giniGain(self, parent_set: np.ndarray, left_set: np.ndarray, right_set: np.ndarray):
+        parent_entropy = self.__gini(parent_set)
+        weighted_left_gini = 1 if left_set.shape[0] == 0 else (left_set.shape[0] / parent_set.shape[
+            0]) * self.__gini(left_set)
+        weighted_right_gini = 1 if right_set.shape[0] == 0 else (right_set.shape[0] / parent_set.shape[
+            0]) * self.__gini(right_set)
+        return parent_entropy - weighted_right_gini - weighted_left_gini
+
+    def __gini(self, train_set):
+        true_labels, false_labels = self.__countLabels(train_set)
+        total_labels = true_labels + false_labels
+        prob_true = true_labels / total_labels
+        prob_false = false_labels / total_labels
+        return 1 - prob_false**2 - prob_true**2
 
     def __informationGain(self, parent_set: np.ndarray, left_set: np.ndarray, right_set: np.ndarray):
         parent_entropy = self.__entropy(parent_set)
@@ -203,7 +190,7 @@ class PersonalizedDecisionTree:
         prob_true = true_labels / total_labels
         prob_false = false_labels / total_labels
         return -((0 if prob_true == 0 else prob_true * math.log2(prob_true)) +
-                 (0 if prob_false == 0 else (1 + self.hyperparam) * prob_false * math.log2(prob_false)))
+                 (0 if prob_false == 0 else (1 + self.entropy_param) * prob_false * math.log2(prob_false)))
 
     def __countLabels(self, train_set: np.ndarray):
         num_true, num_false = 0, 0
@@ -257,23 +244,5 @@ class PersonalizedDecisionTree:
             test_set[:, feature] = (test_set[:, feature] - min_val) / (max_val - min_val)
         return test_set
 
-    def showTree(self):
-        if self.root_node is None:
-            return
-        self.graph.render(filename=self.filename, view=False, cleanup=True)
-
-    def buildGraph(self, node: DTCNode, parent: DTCNode):
-        if node.is_leaf:
-            self.graph.node(f"{node.unique_id}", label=node.toString(), style='filled',
-                            fillcolor='green' if node.label == 0 else "red")
-        else:
-            self.graph.node(f"{node.unique_id}", label=node.toString(), style='filled',
-                            fillcolor=colors[node.feature_index], shape="rectangle")
-        if parent is not None:
-            self.graph.edge(f"{parent.unique_id}", f"{node.unique_id}")
-        if node.left is not None:
-            self.buildGraph(node.left, node)
-        if node.right is not None:
-            self.buildGraph(node.right, node)
 
 

@@ -1,50 +1,5 @@
 import math
-
 import numpy as np
-from graphviz import Digraph
-
-colors = ["Orchid",
-          "PaleGoldenRod",
-          "PaleGreen",
-          "PaleTurquoise",
-          "PaleVioletRed",
-          "PapayaWhip",
-          "PeachPuff",
-          "Peru",
-          "Pink",
-          "Plum",
-          "PowderBlue",
-          "Purple",
-          "RebeccaPurple",
-          "Red",
-          "RosyBrown",
-          "RoyalBlue",
-          "SaddleBrown",
-          "Salmon",
-          "SandyBrown",
-          "SeaGreen",
-          "SeaShell",
-          "Sienna",
-          "Silver",
-          "SkyBlue",
-          "SlateBlue",
-          "SlateGray",
-          "SlateGrey",
-          "Snow",
-          "SpringGreen",
-          "SteelBlue",
-          "Tan",
-          "Teal",
-          "Thistle",
-          "Tomato",
-          "Turquoise",
-          "Violet",
-          "Wheat",
-          "White",
-          "WhiteSmoke",
-          "Yellow",
-          "YellowGreen"]
-
 
 class DTCNode:
 
@@ -78,14 +33,14 @@ class DTCNode:
 
 class DecisionTree:
 
-    def __init__(self, file_name='ID2.dot', normalise=True):
+    def __init__(self, file_name='ID2.dot', normalise=True, split_by="information_gain"):
         self.root_node = None
-        self.graph = Digraph(format="png", filename=file_name)
         self.max_node_name = 0
         self.filename = file_name
         self.feature_maxes = []
         self.feature_mins = []
         self.normalise = normalise
+
 
     def train(self, train_set: np.ndarray):
         if self.root_node is not None:
@@ -152,7 +107,7 @@ class DecisionTree:
         best_split_value = None
         for i in range(1, train_set.shape[1]):
             val, ig = self.__bestFeatureSplitValue(train_set, i)
-            if ig > max_ig:
+            if ig >= max_ig:
                 max_ig, best_index, best_split_value = ig, i, val
         return best_index, best_split_value, max_ig
 
@@ -169,7 +124,7 @@ class DecisionTree:
         for splitter in split_vals:
             left_set, right_set = self.__split_set(train_set, feature_index, splitter)
             ig = self.__informationGain(train_set, left_set, right_set)
-            if ig > max_ig:
+            if ig >= max_ig:
                 best_val, max_ig = splitter, ig
                 if ig == 1:
                     break
@@ -243,23 +198,5 @@ class DecisionTree:
             test_set[:, feature] = (test_set[:, feature] - min_val) / (max_val - min_val)
         return test_set
 
-    def showTree(self):
-        if self.root_node is None:
-            return
-        self.graph.render(filename=self.filename, view=False, cleanup=True)
-
-    def buildGraph(self, node: DTCNode, parent: DTCNode):
-        if node.is_leaf:
-            self.graph.node(f"{node.unique_id}", label=node.toString(), style='filled',
-                            fillcolor='green' if node.label == 0 else "red")
-        else:
-            self.graph.node(f"{node.unique_id}", label=node.toString(), style='filled',
-                            fillcolor=colors[node.feature_index], shape="rectangle")
-        if parent is not None:
-            self.graph.edge(f"{parent.unique_id}", f"{node.unique_id}")
-        if node.left is not None:
-            self.buildGraph(node.left, node)
-        if node.right is not None:
-            self.buildGraph(node.right, node)
 
 
