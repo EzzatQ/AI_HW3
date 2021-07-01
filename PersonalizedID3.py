@@ -98,21 +98,20 @@ class PersonalizedID3:
 
 
 def hyperParamTuning(data_set: np.ndarray):
-    # to run experiment, import ID3, and run the command ID3.experiment(datas_set)
     k = 5
-    hyperparam_options = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7,1.8,1.9,2,3,4,5,6,7,8,9,10]
+    hyperparam_options = [0,0.05,0.1,0.15,0.2,0.25,0.3,0.35,0.4,0.45,0.5,0.55,0.6,0.65,0.7,0.75,0.8,0.85,0.90,0.95,1]
     hyperparams = []
     hyperparams_loss = []
     for param in hyperparam_options:
-        file_name = f"experiment_ID3_with_pruning_param_{param}"
-        kf = KFoldCrossValidation(k, PersonalizedID3, data_set, shuffle=True, filename=file_name, hyperparam=1)
+        file_name = f"experiment_2/ID3_with_hyperparam_{param}"
+        kf = KFoldCrossValidation(k, PersonalizedID3, data_set, shuffle=True, filename=file_name, hyperparam=1, eval_type="loss")
         acc = kf.getError()
         hyperparams.append(param)
         hyperparams_loss.append(acc)
-        print(f"accuracy with early pruning param {param}: {acc}")
+        print(f"accuracy with hyperparam {param}: {acc}")
         plt.plot(hyperparams, hyperparams_loss, "-o")
-        plt.xlabel('Pruning Parameter')
-        plt.ylabel('Accuracy')
-        plt.savefig(f"hyperparam_tuning_with_{param}.png")
+        plt.xlabel('Hyper Parameter')
+        plt.ylabel('Loss')
+        plt.savefig(f"experiment_2/hyperparam_tuning_with_{param}.png")
         plt.show()
 

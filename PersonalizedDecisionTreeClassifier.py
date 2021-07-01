@@ -131,7 +131,7 @@ class PersonalizedDecisionTree:
         is_leaf = true_num == total_num or false_num == total_num
         self.max_node_name += 1
         if is_leaf:
-            label = 0 if false_num > true_num * self.hyperparam else 1
+            label = 0 if false_num > true_num else 1
             node = DTCNode(is_leaf=True, label=label, name=self.max_node_name,
                            true_sample_num=true_num, false_sample_num=false_num)
             return node
@@ -199,11 +199,11 @@ class PersonalizedDecisionTree:
 
     def __entropy(self, train_set):
         true_labels, false_labels = self.__countLabels(train_set)
-        total_labels = self.hyperparam * true_labels + false_labels
-        prob_true = self.hyperparam * true_labels / total_labels
+        total_labels = true_labels + false_labels
+        prob_true = true_labels / total_labels
         prob_false = false_labels / total_labels
         return -((0 if prob_true == 0 else prob_true * math.log2(prob_true)) +
-                 (0 if prob_false == 0 else prob_false * math.log2(prob_false)))
+                 (0 if prob_false == 0 else (1 + self.hyperparam) * prob_false * math.log2(prob_false)))
 
     def __countLabels(self, train_set: np.ndarray):
         num_true, num_false = 0, 0
@@ -220,6 +220,8 @@ class PersonalizedDecisionTree:
         possible_vals = []
         for i in range(features_copy.shape[0] - 1):
             diff = (feature_values[i + 1] + feature_values[i]) / 2
+            if diff == feature_values[i]:
+                continue
             possible_vals.append(diff)
         return possible_vals
 

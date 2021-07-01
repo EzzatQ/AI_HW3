@@ -206,6 +206,8 @@ class DecisionTree:
         possible_vals = []
         for i in range(features_copy.shape[0] - 1):
             diff = (feature_values[i + 1] + feature_values[i]) / 2
+            if diff == feature_values[i]:
+                continue
             possible_vals.append(diff)
         return possible_vals
 
